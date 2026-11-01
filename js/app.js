@@ -1,7 +1,7 @@
 // Driftline — drift through the real world. Map data © OpenStreetMap contributors (ODbL).
 import {clamp,lerp,nextFrame} from './util.js';
-import {setOrigin,search,reverse,shortName} from './geo.js';
-import {initWorld,loadArea,unloadAll,updateWorld,height,surfaceAt,nearestRoad,placeName,collidersNear,rayWalls,builtChunks,spawnPoint,CH,W} from './world.js';
+import {setOrigin,search,reverse,shortName,toLocal,toLatLon} from './geo.js';
+import {initWorld,loadArea,jumpTo,unloadAll,updateWorld,height,surfaceAt,nearestRoad,placeName,collidersNear,rayWalls,builtChunks,spawnPoint,CH,W} from './world.js';
 
 const THREE=window.THREE;
 const $=id=>document.getElementById(id);
@@ -32,7 +32,7 @@ const sky=(()=>{
   const m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,
     uniforms:{top:{value:new THREE.Color('#4f7fc4')},mid:{value:new THREE.Color('#a9c2dd')},hor:{value:FOGC},sun:{value:SUN}},
     vertexShader:`varying vec3 vP;void main(){vP=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-    fragmentShader:`uniform vec3 top,mid,hor,sun;varying vec3 vP;void main(){float h=vP.y;vec3 c=mix(hor,mid,smoothstep(-0.02,0.12,h));c=mix(c,top,smoothstep(0.12,0.6,h));float s=max(dot(vP,sun),0.0);c+=vec3(1.0,0.75,0.45)*pow(s,8.0)*0.35+vec3(1.0,0.95,0.85)*pow(s,900.0)*1.2;gl_FragColor=vec4(c,1.0);}`});
+    fragmentShader:`uniform vec3 top,mid,hor,sun;varying vec3 vP;float hs(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hs(i),hs(i+vec2(1,0)),f.x),mix(hs(i+vec2(0,1)),hs(i+vec2(1,1)),f.x),f.y);}float fbm(vec2 p){float s=0.0,a=0.5;for(int k=0;k<5;k++){s+=a*vn(p);p*=2.03;a*=0.5;}return s;}void main(){float h=vP.y;vec3 c=mix(hor,mid,smoothstep(-0.02,0.12,h));c=mix(c,top,smoothstep(0.12,0.6,h));float s=max(dot(vP,sun),0.0);c+=vec3(1.0,0.75,0.45)*pow(s,8.0)*0.35+vec3(1.0,0.95,0.85)*pow(s,900.0)*1.2;if(h>0.0){vec2 cp=vP.xz/(h+0.08)*1.3;float n=fbm(cp+vec2(3.1,7.7));float cl=smoothstep(0.52,0.78,n)*smoothstep(0.0,0.12,h)*(1.0-smoothstep(0.55,0.9,h));vec3 cc=mix(vec3(0.82,0.84,0.88),vec3(1.0,0.98,0.95),smoothstep(0.5,0.9,n)+pow(s,4.0)*0.3);c=mix(c,cc,cl*0.85);}gl_FragColor=vec4(c,1.0);}`});
   const s=new THREE.Mesh(g,m);s.renderOrder=-1;s.frustumCulled=false;scene.add(s);return s;
 })();
 initWorld(scene,renderer);
@@ -466,7 +466,7 @@ async function go(){
   toast(spawnAt.name||selPt.name||'Los geht’s','good');
 }
 $('retryBtn').onclick=go;
-$('backBtn').onclick=showPicker;
+$('backBtn').onclick=()=>{if(W.ready){loadEl.hidden=true;hud.hidden=false;touchEl.hidden=!isTouch;state='drive'}else showPicker()};
 $('resumeBtn').onclick=()=>setPause(false);
 $('newPlaceBtn').onclick=showPicker;
 $('respawnBtn').onclick=()=>{spawn(spawnAt);setPause(false)};
@@ -492,14 +492,16 @@ function buildGarage(){
 sel=clamp(store.get('driftline-car',1)|0,0,PRESETS.length-1);paint=clamp(store.get('driftline-paint',1)|0,0,PAINTS.length-1);
 
 /* ================= map picker ================= */
+const ATTR='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
+const baseLayer=()=>L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',attribution:ATTR});
+const satLayer=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Luftbild © Esri, Maxar, Earthstar Geographics'});
 let lmap=null,marker=null,area=null,selPt=null,satOn=false,osmL=null,satL=null;
 function initPicker(){
   if(!window.L){$('pickErr').textContent='Die Karte konnte nicht geladen werden. Prüfe deine Internetverbindung und lade die Seite neu.';$('pickErr').hidden=false;return}
   const last=store.get('driftline-recent',[])[0];
   lmap=L.map('map',{zoomControl:false,attributionControl:true,worldCopyJump:true}).setView(last?[last.lat,last.lon]:[51.1,10.4],last?15:6);
   L.control.zoom({position:'topright'}).addTo(lmap);
-  osmL=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende'}).addTo(lmap);
-  satL=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Luftbild © Esri, Maxar, Earthstar Geographics'});
+  osmL=baseLayer().addTo(lmap);satL=satLayer();
   lmap.on('click',e=>choose(e.latlng.lat,e.latlng.lng));
   const h=location.hash.match(/^#(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
   if(h){const la=+h[1],lo=+h[2];if(Math.abs(la)<85&&Math.abs(lo)<=180){lmap.setView([la,lo],16);choose(la,lo)}}
@@ -543,6 +545,57 @@ $('layerBtn').onclick=()=>{satOn=!satOn;if(satOn){lmap.removeLayer(osmL);satL.ad
 $('goBtn').onclick=go;
 function toastPick(t){const e=$('pickErr');e.textContent=t;e.hidden=false;clearTimeout(toastPick.t);toastPick.t=setTimeout(()=>e.hidden=true,4000)}
 
+/* ================= in-game map ================= */
+let gmap=null,gCar=null,gTarget=null,gStart=null,gArea=null,gSat=false,gBase=null,gSatL=null,gPt=null,mapFrom='drive';
+const carIcon=()=>L.divIcon({className:'carpin',html:'<span></span>',iconSize:[30,30],iconAnchor:[15,15]});
+function openMap(){
+  if(state!=='drive'&&state!=='pause')return;
+  mapFrom=state;state='map';for(const k in keys)keys[k]=false;
+  pauseEl.hidden=true;touchEl.hidden=true;$('gmapOv').hidden=false;$('tpBtn').disabled=true;$('tpName').textContent='Tippe auf die Karte, um dorthin zu springen';gPt=null;
+  const [la,lo]=toLatLon(car.x,car.z);
+  if(!gmap){
+    gmap=L.map('gmap',{zoomControl:false,worldCopyJump:true}).setView([la,lo],16);
+    L.control.zoom({position:'topright'}).addTo(gmap);
+    gBase=baseLayer().addTo(gmap);gSatL=satLayer();
+    gCar=L.marker([la,lo],{icon:carIcon(),zIndexOffset:1000}).addTo(gmap);
+    gmap.on('click',e=>pickTarget(e.latlng.lat,e.latlng.lng));
+  }else{gmap.setView([la,lo],gmap.getZoom());}
+  if(gTarget){gmap.removeLayer(gTarget);gTarget=null}
+  if(spawnAt){const [sa,so]=toLatLon(spawnAt.x,spawnAt.z);if(!gStart)gStart=L.circleMarker([sa,so],{radius:7,color:'#fff',weight:2,fillColor:'#1f8a5b',fillOpacity:1}).addTo(gmap).bindTooltip('Startpunkt');else gStart.setLatLng([sa,so])}
+  updateMapCar();
+  setTimeout(()=>gmap.invalidateSize(),30);
+}
+function updateMapCar(){
+  if(!gCar)return;const [la,lo]=toLatLon(car.x,car.z);gCar.setLatLng([la,lo]);
+  const el=gCar.getElement();if(el){const deg=Math.atan2(Math.sin(car.th),-Math.cos(car.th))*180/Math.PI;const sp=el.querySelector('span');if(sp)sp.style.transform=`rotate(${deg}deg)`}
+}
+async function pickTarget(la,lo){
+  gPt={lat:la,lon:lo,name:null};
+  if(!gTarget)gTarget=L.marker([la,lo],{icon:pinIcon()}).addTo(gmap);else gTarget.setLatLng([la,lo]);
+  const [x,z]=toLocal(la,lo),d=Math.hypot(x-car.x,z-car.z);
+  $('tpName').textContent=(d<1000?Math.round(d)+' m':(d/1000).toFixed(1).replace('.',',')+' km')+' entfernt';$('tpBtn').disabled=false;
+  const r=await reverse(la,lo);if(gPt&&gPt.lat===la){gPt.name=shortName(r);if(gPt.name)$('tpName').textContent=gPt.name+' · '+$('tpName').textContent}
+}
+function closeMap(){$('gmapOv').hidden=true;state=mapFrom;if(state==='pause')pauseEl.hidden=false;else touchEl.hidden=!isTouch}
+async function teleport(){
+  if(!gPt)return;
+  const [x,z]=toLocal(gPt.lat,gPt.lon);
+  $('gmapOv').hidden=true;
+  if(Math.hypot(x,z)>4000){selPt={...gPt};await go();return}
+  state='loading';loadEl.hidden=false;hud.hidden=true;$('loadErr').hidden=true;$('loadBtns').hidden=true;
+  $('loadPlace').textContent=gPt.name||'Neuer Ort';const bar=$('loadBar'),step=$('loadStep');
+  try{await jumpTo(x,z,(t,p)=>{step.textContent=t;bar.style.width=Math.round(p*100)+'%'})}
+  catch(e){$('loadErr').textContent='Die Kartendaten für diesen Ort konnten nicht geladen werden ('+(e.message||'Netzwerkfehler')+'). Versuch es gleich noch mal.';$('loadErr').hidden=false;$('loadBtns').hidden=false;return}
+  const r=nearestRoad(x,z,300);
+  if(r)placeCar(r.x,r.z,Math.atan2(r.dx,r.dz));else placeCar(x,z,car.th);
+  const y=height(car.x,car.z);camPos.set(car.x-Math.sin(car.th)*8,y+3,car.z-Math.cos(car.th)*8);look.set(car.x,y+1,car.z);
+  loadEl.hidden=true;hud.hidden=false;touchEl.hidden=!isTouch;state='drive';cur=0;toast(gPt.name||'Angekommen','good');
+}
+$('mapBtn').onclick=openMap;$('pMapBtn').onclick=openMap;$('gmapClose').onclick=closeMap;$('tpBtn').onclick=teleport;
+$('gLayerBtn').onclick=()=>{gSat=!gSat;if(gSat){gmap.removeLayer(gBase);gSatL.addTo(gmap)}else{gmap.removeLayer(gSatL);gBase.addTo(gmap)}$('gLayerBtn').textContent=gSat?'Karte':'Satellit'};
+$('gCenter').onclick=()=>{const [la,lo]=toLatLon(car.x,car.z);gmap.setView([la,lo],Math.max(gmap.getZoom(),16))};
+addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyM'){if(state==='map')closeMap();else openMap()}else if(e.code==='Escape'&&state==='map')closeMap()});
+
 /* ================= loop ================= */
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 addEventListener('resize',resize);
@@ -550,7 +603,7 @@ let last=performance.now(),acc=0,ang=0;
 function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(.1,(now-last)/1000);last=now;
-  if(state==='pick'||state==='loading'){updateAudio();return}
+  if(state==='pick'||state==='loading'||state==='map'){updateAudio();return}
   if(state==='drive'){
     readInput(dt);acc+=dt;const h=1/120;
     while(acc>=h){physics(h);collide();acc-=h}

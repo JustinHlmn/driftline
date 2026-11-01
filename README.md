@@ -15,6 +15,7 @@ Die Seite läuft direkt im Browser (Desktop und Handy), ohne Installation und oh
 | S / ↓ | Bremse, Rückwärts |
 | A / D | Lenken |
 | Leertaste | Handbremse, startet den Drift |
+| M | Karte öffnen, irgendwohin teleportieren |
 | C | Kamera wechseln |
 | R | Zurück auf die nächste Straße |
 | P / Esc | Pause |

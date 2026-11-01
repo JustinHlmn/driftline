@@ -121,3 +121,17 @@ body.touch .place{max-width:120px}
   .ov{background:rgba(10,9,8,.82)}
 }
 @media (prefers-reduced-motion:reduce){.drift,.toast,.pbar i{transition:none}}
+
+/* ---------- in-game map ---------- */
+#gmapOv{position:fixed;inset:0;z-index:40;background:#0d0c0b}
+#gmap{position:absolute;inset:0;background:#e8e4dc}
+.gbar{position:absolute;inset:0;pointer-events:none;z-index:500;display:flex;flex-direction:column;justify-content:space-between;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));padding-block:calc(14px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-bottom,0px))}
+.gtop{display:flex;gap:8px;flex-wrap:wrap;pointer-events:auto;align-self:flex-start}
+.gtop .ib{height:40px;padding:0 14px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.gsheet{pointer-events:auto;align-self:center;width:min(520px,100%);display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px 16px;align-items:center;padding:14px 16px;border-radius:12px;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--edge);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.gsheet .lbl{grid-column:1}
+.gsheet b{grid-column:1;font:800 20px/1.15 var(--f-display);min-width:0}
+.gsheet .btn{grid-column:2;grid-row:1/3;font-size:19px;padding:11px 20px}
+.carpin{filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.carpin span{display:block;width:30px;height:30px;background:var(--accent);clip-path:polygon(50% 0,92% 100%,50% 76%,8% 100%)}
+@media (max-width:560px){.gsheet{grid-template-columns:1fr}.gsheet .btn{grid-column:1;grid-row:auto}}

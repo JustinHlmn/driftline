@@ -48,6 +48,7 @@
         <span><kbd>S</kbd> <kbd>↓</kbd></span><span>Bremse / Rückwärts</span>
         <span><kbd>A</kbd> <kbd>D</kbd></span><span>Lenken</span>
         <span><kbd>Leertaste</kbd></span><span>Handbremse, startet den Drift</span>
+        <span><kbd>M</kbd></span><span>Karte öffnen, teleportieren</span>
         <span><kbd>C</kbd></span><span>Kamera wechseln</span>
         <span><kbd>R</kbd></span><span>Zurück auf die Straße</span>
         <span><kbd>P</kbd> <kbd>Esc</kbd></span><span>Pause</span>
@@ -83,6 +84,7 @@
     <div class="anglebar"><i id="hAngBar"></i></div>
   </div>
   <div class="tr">
+    <button type="button" class="ib" id="mapBtn" aria-label="Karte öffnen">KARTE</button>
     <button type="button" class="ib" id="camBtn" aria-label="Kamera wechseln">KAM</button>
     <button type="button" class="ib" id="sndBtn" aria-label="Ton an oder aus">TON</button>
     <button type="button" class="ib" id="pauseBtn" aria-label="Pause">II</button>
@@ -102,11 +104,28 @@
   <div class="g"><button type="button" class="tb" data-k="hand">HAND</button><button type="button" class="tb" data-k="brake">BREMSE</button><button type="button" class="tb big" data-k="gas">GAS</button></div>
 </div>
 
+<section id="gmapOv" hidden>
+  <div id="gmap" aria-label="Karte"></div>
+  <div class="gbar">
+    <div class="gtop">
+      <button type="button" class="ib" id="gmapClose">Zurück</button>
+      <button type="button" class="ib" id="gCenter">Zum Auto</button>
+      <button type="button" class="ib" id="gLayerBtn">Satellit</button>
+    </div>
+    <div class="gsheet">
+      <span class="lbl">Teleport</span>
+      <b id="tpName">Tippe auf die Karte, um dorthin zu springen</b>
+      <button type="button" class="btn" id="tpBtn" disabled>Hierhin fahren</button>
+    </div>
+  </div>
+</section>
+
 <section class="ov" id="pause" hidden>
   <div class="panel">
     <h2 class="logo small">PAUSE</h2>
     <div class="btns">
       <button type="button" class="btn" id="resumeBtn">Weiter</button>
+      <button type="button" class="btn ghost" id="pMapBtn">Karte</button>
       <button type="button" class="btn ghost" id="respawnBtn">Zum Startpunkt</button>
       <button type="button" class="btn ghost" id="newPlaceBtn">Neuer Ort</button>
     </div>
