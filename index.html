@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Driftline</title>
+<meta name="description" content="Drift-Simulator in der echten Welt: Ort auf der Karte wählen, losfahren.">
+<meta name="theme-color" content="#0d0c0b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;800&family=Saira:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<!-- ================= map picker ================= -->
+<section id="picker">
+  <div id="map" aria-label="Karte"></div>
+  <aside class="sheet">
+    <h1 class="logo">DRIFT<span>LINE</span></h1>
+    <p class="tag">Such dir einen Ort aus. Straßen, Häuser, Wald und Gelände werden aus echten Kartendaten gebaut, und du fährst genau dort.</p>
+    <form id="searchForm" class="search" autocomplete="off">
+      <input id="q" type="search" placeholder="Adresse oder Ort suchen" aria-label="Adresse oder Ort suchen">
+      <button type="submit" class="ib">Suchen</button>
+    </form>
+    <ul id="results" class="results"></ul>
+    <div class="row">
+      <button type="button" id="locBtn" class="chip">Mein Standort</button>
+      <button type="button" id="layerBtn" class="chip">Satellit</button>
+    </div>
+    <div class="sel">
+      <span class="lbl">Startpunkt</span>
+      <b id="selName">Tippe auf die Karte</b>
+      <span id="selCoord" class="coord"></span>
+    </div>
+    <div id="recentWrap" hidden><span class="lbl">Zuletzt gefahren</span><div id="recent" class="row"></div></div>
+    <span class="lbl">Auto</span>
+    <div class="cars" id="cars"></div>
+    <div class="paint" id="paint"></div>
+    <label class="opt"><input type="checkbox" id="assist" checked> Drift-Assist</label>
+    <button type="button" class="btn" id="goBtn" disabled>Hier losfahren</button>
+    <p class="err" id="pickErr" hidden></p>
+    <details class="keys">
+      <summary>Steuerung</summary>
+      <div class="kgrid">
+        <span><kbd>W</kbd> <kbd>↑</kbd></span><span>Gas</span>
+        <span><kbd>S</kbd> <kbd>↓</kbd></span><span>Bremse / Rückwärts</span>
+        <span><kbd>A</kbd> <kbd>D</kbd></span><span>Lenken</span>
+        <span><kbd>Leertaste</kbd></span><span>Handbremse, startet den Drift</span>
+        <span><kbd>C</kbd></span><span>Kamera wechseln</span>
+        <span><kbd>R</kbd></span><span>Zurück auf die Straße</span>
+        <span><kbd>P</kbd> <kbd>Esc</kbd></span><span>Pause</span>
+      </div>
+      <p>Gamepad: Stick lenkt, R2 Gas, L2 Bremse, A Handbremse.</p>
+    </details>
+  </aside>
+</section>
+
+<!-- ================= loading ================= -->
+<section id="loading" class="ov" hidden>
+  <div class="panel">
+    <h2 class="logo small">DRIFT<span>LINE</span></h2>
+    <span class="lbl">Baue</span>
+    <b class="place-big" id="loadPlace">–</b>
+    <div class="pbar"><i id="loadBar"></i></div>
+    <span class="step" id="loadStep">Starte …</span>
+    <p class="err" id="loadErr" hidden></p>
+    <div class="btns" id="loadBtns" hidden><button type="button" class="btn" id="retryBtn">Nochmal versuchen</button><button type="button" class="btn ghost" id="backBtn">Anderer Ort</button></div>
+  </div>
+</section>
+
+<!-- ================= HUD ================= -->
+<div class="hud" id="hud" hidden>
+  <div class="tl">
+    <span class="lbl">Punkte</span>
+    <span class="score" id="hScore">0</span>
+    <span class="sub" id="hBest">Beste Combo 0</span>
+  </div>
+  <div class="drift" id="hDrift">
+    <span class="pts" id="hCur">0</span>
+    <div class="drow"><span class="mult" id="hMult">x1</span><span class="ang" id="hAng">0°</span></div>
+    <div class="anglebar"><i id="hAngBar"></i></div>
+  </div>
+  <div class="tr">
+    <button type="button" class="ib" id="camBtn" aria-label="Kamera wechseln">KAM</button>
+    <button type="button" class="ib" id="sndBtn" aria-label="Ton an oder aus">TON</button>
+    <button type="button" class="ib" id="pauseBtn" aria-label="Pause">II</button>
+  </div>
+  <span class="net" id="hNet" hidden></span>
+  <div class="br">
+    <div class="spd"><b id="hSpd">0</b><span>KM/H</span></div>
+    <div class="gear"><div class="rpm"><i id="hRpm"></i></div><b id="hGear">1</b></div>
+  </div>
+  <div class="bl"><canvas id="mini" width="340" height="340"></canvas><div class="place" id="hPlace">–</div></div>
+  <span class="attr">© OpenStreetMap-Mitwirkende</span>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<div class="touch" id="touch" hidden>
+  <div class="g"><button type="button" class="tb" data-k="left" aria-label="Links">◀</button><button type="button" class="tb" data-k="right" aria-label="Rechts">▶</button></div>
+  <div class="g"><button type="button" class="tb" data-k="hand">HAND</button><button type="button" class="tb" data-k="brake">BREMSE</button><button type="button" class="tb big" data-k="gas">GAS</button></div>
+</div>
+
+<section class="ov" id="pause" hidden>
+  <div class="panel">
+    <h2 class="logo small">PAUSE</h2>
+    <div class="btns">
+      <button type="button" class="btn" id="resumeBtn">Weiter</button>
+      <button type="button" class="btn ghost" id="respawnBtn">Zum Startpunkt</button>
+      <button type="button" class="btn ghost" id="newPlaceBtn">Neuer Ort</button>
+    </div>
+    <label class="opt"><input type="checkbox" id="assist2" checked> Drift-Assist</label>
+    <p class="note">Kartendaten © OpenStreetMap-Mitwirkende (ODbL) · Höhendaten: AWS Terrain Tiles (SRTM, EU-DEM u. a.)</p>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
