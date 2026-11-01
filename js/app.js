@@ -492,8 +492,11 @@ function buildGarage(){
 sel=clamp(store.get('driftline-car',1)|0,0,PRESETS.length-1);paint=clamp(store.get('driftline-paint',1)|0,0,PAINTS.length-1);
 
 /* ================= map picker ================= */
-const ATTR='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
-const baseLayer=()=>L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',attribution:ATTR});
+const ATTR='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende';
+// Map tiles without any API key: OpenStreetMap first, automatic fallback to other keyless OSM servers on errors
+const TILE_SRC=['https://tile.openstreetmap.org/{z}/{x}/{y}.png','https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png','https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png'];
+const baseLayer=()=>{let i=0,errs=0;const l=L.tileLayer(TILE_SRC[0],{maxZoom:19,subdomains:'abc',attribution:ATTR});
+  l.on('tileerror',()=>{if(++errs>6&&i<TILE_SRC.length-1){i++;errs=0;l.setUrl(TILE_SRC[i])}});l.on('tileload',()=>{errs=0});return l};
 const satLayer=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Luftbild © Esri, Maxar, Earthstar Geographics'});
 let lmap=null,marker=null,area=null,selPt=null,satOn=false,osmL=null,satL=null;
 function initPicker(){
